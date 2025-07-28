@@ -1,5 +1,6 @@
 use hdf5::{Dataset, File};
 use ndarray::{Array1, ArrayBase, Data, Ix1, OwnedRepr, RawData, RawDataClone};
+use pyo3::prelude::*;
 
 #[derive(Debug, Clone)]
 pub struct Histogram<S: RawData<Elem = f64> + RawDataClone + Data> {
@@ -59,6 +60,31 @@ pub fn integrate<S: RawData<Elem = f64> + RawDataClone + Data>(
         .collect();
 
     (&hist.bins * factors).sum()
+}
+
+#[pyclass]
+pub struct OwnedHisto {
+    inner: Histogram<OwnedRepr<f64>>,
+}
+
+#[pymethods]
+impl OwnedHisto {
+    #[staticmethod]
+    fn load(filename: &str) -> Self {
+        Self {
+            inner: Histogram::load(filename).expect("Failed to load histogram from HDF5 file"),
+        }
+    }
+
+    fn integrate(&self, range: (f64, f64)) -> PyResult<f64> {
+        Ok(integrate(self.inner.clone(), range))
+    }
+}
+
+#[pymodule]
+fn rust_workshop_3(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<OwnedHisto>()?;
+    Ok(())
 }
 
 #[cfg(test)]
